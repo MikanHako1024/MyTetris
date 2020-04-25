@@ -5,12 +5,19 @@ using UnityEngine.Tilemaps;
 
 // TODO : 更好的命名 
 
+// TODO : SetTiles
+
+// ？TODO : 图层顺序 瓦片顺序 ...
+
+// TODO : 切换选中
+
 public class TetrisTilemap : MonoBehaviour {
 
 	public UnityEngine.Tilemaps.Tilemap tilemap;
 
 	private void Start() {
 		tilemap = GetComponent<UnityEngine.Tilemaps.Tilemap>();
+		//InitLayerOrder();
 		InitTilemapData();
 		RefreshTilemapShow();
 	}
@@ -25,14 +32,22 @@ public class TetrisTilemap : MonoBehaviour {
 	public float lastCreateTime = -60f;
 
 	private void Update() {
+		// 暂时这样
+		// TODO : ...
 		if (Input.GetKey(KeyCode.Z) && Time.time - lastCreateTime > CreateInterval) {
 			TetrisShape shape = new TetrisShape();
 			shape.SetPosition(GetTopCenterPosition());
 			AddShape(shape);
 
 			lastCreateTime = Time.time;
-
-			selectedShape = shape;
+			
+			//selectedShape = shape;
+			// ？因为更换selectedShape的时候还要变换其他的东西 ...
+			// ？比如还要清除选中方块的光标等 ...
+			// ？所以要把更换selectedShape写成一个方法或setter 在方法里完成其他操作 ...
+			// ？对selectedShape更安全、严格的管理，即是扩展其getter,setter，在其中完成其他操作使得安全 ...
+			// TODO : 笔记
+			SetSelectedShape(shape);
 		}
 	}
 	
@@ -97,7 +112,8 @@ public class TetrisTilemap : MonoBehaviour {
 		// ？修改 tilemapData 的同时直接写进 tilemap ...
 		// ？而不必在固定时间 全部写进 tilemap ...
 		//tilemap.SetTile(new Vector3Int(x, y, 0), tileList[tilemapData[y][x]]);
-		ShowTile(x, y, tilemapData[y][x]);
+		//ShowTile(x, y, tilemapData[y][x]);
+		ShowTileMapData(x, y, tilemapData[y][x]);
 		// ？因为要显示的不仅有已经停止的方块 ...
 		// ？还有活动的方块也要显示，但是不在 tilemapData 中 ...
 		// ？所以暂时还是使用全部刷新 ...
@@ -285,6 +301,8 @@ public class TetrisTilemap : MonoBehaviour {
 	#region 停止方块
 
 	public bool StopShape(TetrisShape shape) {
+		CheckSelectedShapeStop(shape);
+
 		TetrisShapeInfo info = RemoveShape(shape);
 		if (info != null) {
 			TransShape(shape);
@@ -304,10 +322,36 @@ public class TetrisTilemap : MonoBehaviour {
 
 	#endregion
 
+	
+	#region 选中的图形
+	
+	[System.NonSerialized]
+	public TetrisShape selectedShape = null;
+	
+	public void SetSelectedShape(TetrisShape shape) {
+		ClearCursorShow();
+		selectedShape = shape;
+	}
+
+	public void UnsetSelectedShape() {
+		SetSelectedShape(null);
+	}
+
+	// ？在停止图形的时候 判断是否是被选中的图形 若是则清除光标 ...
+	public bool CheckSelectedShapeStop(TetrisShape shape) {
+		if (shape == selectedShape) {
+			UnsetSelectedShape();
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+
+	#endregion
+
 
 	#region 方块移动和旋转控制
-	
-	public TetrisShape selectedShape = null;
 
 	/*
 	public float keyInterval = 0.1f;
@@ -392,57 +436,232 @@ public class TetrisTilemap : MonoBehaviour {
 	#endregion
 
 
-	#region 更新显示
+	#region 显示到tilemap上
 
 	public TileBase GetTileBase(int data) {
 		return 0 <= data && data < tileList.Length ? tileList[data] : null;
 	}
 
 	// ？显示到tilemap上 允许超出tilemapData的范围 ...
+	/*
 	public void ShowTile(int x, int y, int data) {
 		tilemap.SetTile(new Vector3Int(x, y, 0), GetTileBase(data));
+		//tilemap.SetTile(new Vector3Int(x, y, data), GetTileBase(data));
+		// ？测试用 结果4号图块大范围出现 ...
+		// ？第一个参数的z值表示图层，即显示的顺序 ...
 	}
 	public void ShowTile(Vector2Int pos, int data) {
 		ShowTile(pos.x, pos.y, data);
 	}
+	*/
+	// ？加上对图层的配置 ...
+	public void ShowTile(int x, int y, int data, int layer = 0) {
+		tilemap.SetTile(new Vector3Int(x, y, layer), GetTileBase(data));
+	}
+	public void ShowTile(Vector2Int pos, int data, int layer = 0) {
+		ShowTile(pos.x, pos.y, data, layer);
+	}
+	
+
+	public enum TileLayer {
+		mapData, cursor, shape
+	}
+
+	public void ShowTileMapData(int x, int y, int data) {
+		ShowTile(x, y, data, (int)TileLayer.mapData);
+	}
+	public void ShowTileMapData(Vector2Int pos, int data) {
+		ShowTileMapData(pos.x, pos.y, data);
+	}
+	
+	public void ShowTileShape(int x, int y, int data) {
+		ShowTile(x, y, data, (int)TileLayer.shape);
+	}
+	public void ShowTileShape(Vector2Int pos, int data) {
+		ShowTileShape(pos.x, pos.y, data);
+	}
+
+	//public int cursorTileIndex = 5;
+	//public void ShowTileCursor(int x, int y) {
+	//	ShowTile(x, y, cursorTileIndex, (int)TileLayer.cursor);
+	//}
+	//public void ShowTileCursor(Vector2Int pos) {
+	//	ShowTileCursor(pos.x, pos.y);
+	//}
+	public void ShowTileCursor(int x, int y, int data) {
+		ShowTile(x, y, data, (int)TileLayer.cursor);
+	}
+	public void ShowTileCursor(Vector2Int pos, int data) {
+		ShowTileCursor(pos.x, pos.y, data);
+	}
+
+	public void InitLayerOrder() {
+		// ？测试是否是 以第一次设置瓦片的顺序作为显示顺序 ...
+		/*
+		ShowTileMapData(0, 0, 0);
+		ShowTileMapData(0, 0, -1);
+		ShowTileCursor(0, 0, 0);
+		ShowTileCursor(0, 0, -1);
+		ShowTileShape(0, 0, 0);
+		ShowTileShape(0, 0, -1);
+		*/
+		// ？结果 不是这样的 ...
+		
+		// ？把MapData图层改为10进行测试 ...
+		/*
+		ShowTileMapData(-1, 5, 3);
+		ShowTileCursor(-1, 3, 2);
+		ShowTileShape(-1, 1, 1);
+		*/
+		/*
+		ShowTileMapData(-1, 5, 3); // 3
+		ShowTileCursor(-1, 5, 2);
+		ShowTileCursor(-1, 3, 2);
+		ShowTileShape(-1, 3, 1); // 1
+		ShowTileShape(-1, 1, 1);
+		ShowTileMapData(-1, 1, 3); // 3
+		*/
+		/*
+		ShowTileMapData(-1, 3, 3); // 3
+		ShowTileCursor(-1, 3, 2);
+		ShowTileShape(-1, 3, 1);
+		*/
+		
+		// ？把MapData图层改为10与cursor进行测试 ...
+		/*
+		ShowTileCursor(-1, 5, 2); // 0
+		ShowTileMapData(-1, 5, 0);
+
+		ShowTileMapData(-1, 3, 0); // 0
+		ShowTileCursor(-1, 3, 2);
+		
+		ShowTileCursor(-1, 1, 2);
+		ShowTileMapData(-1, 1, 0); // 0
+		ShowTileCursor(-1, 1, 2);
+		*/
+		
+		// ？把MapData图层改为10与cursor进行测试 ...
+		/*
+		ShowTileCursor(-1, 5, 0);
+		ShowTileMapData(-1, 5, 5); // 5
+
+		ShowTileMapData(-1, 3, 0);
+		ShowTileCursor(-1, 3, 5); // 5
+		
+		ShowTileCursor(-1, 1, 5); // 5
+		ShowTileMapData(-1, 1, 0);
+		ShowTileCursor(-1, 1, 5);  // 5
+		*/
+		
+		// ？把MapData图层改为0与cursor进行测试 ...
+		/*
+		ShowTileCursor(-1, 7, 5); // 5
+		ShowTileMapData(-1, 7, 0);
+
+		ShowTileCursor(-1, 5, 0);
+		ShowTileMapData(-1, 5, 5); // 5
+		
+		ShowTileCursor(-1, 3, 0);
+		ShowTileMapData(-1, 3, 1); // 1
+		
+		ShowTileCursor(-1, 1, 1);
+		ShowTileMapData(-1, 1, 0); // 0
+		*/
+
+		// ？与图层无关  与瓦片有关 ...
+
+	}
+	// ？...
+
+	#endregion
+
+
+	#region 显示图形
 
 	public void ClearShapeShow() {
 		Vector2Int[] list;
-		int data;
+		//int data;
 		foreach (TetrisShape shape in shapeDict.Keys) {
 			list = shape.GetOccupyPositionList();
 			foreach (Vector2Int pos in list) {
 				//ShowTile(pos, 0);
-				data = GetTilemapData(pos);
+				//data = GetTilemapData(pos);
 				//data = data == -1 ? 0 : data;
-				ShowTile(pos, data);
+				//ShowTile(pos, data);
+				//ShowTileShape(pos, data);
+				// ？因为有分图层 所以直接设为null 就可以了 ...
+				ShowTileShape(pos, -1);
 			}
 		}
+
+		ClearCursorShow();
 	}
 
 	public void ShowAllShape() {
+		RefreshCursorShow();
+
 		Vector2Int[] list;
 		foreach (TetrisShape shape in shapeDict.Keys) {
 			list = shape.GetOccupyPositionList();
 			foreach (Vector2Int pos in list) {
-				ShowTile(pos, shape.GetSquareByGlobal(pos));
+				//ShowTile(pos, shape.GetSquareByGlobal(pos));
+				ShowTileShape(pos, shape.GetSquareByGlobal(pos));
 			}
 		}
+
+		//RefreshCursorShow();
 	}
+
+	#endregion
+
+
+	#region 刷新显示地图数据
 
 	public void RefreshTilemapShow() {
 		for (int y = 0; y < tilemapHeight; y++) {
 			for (int x = 0; x < tilemapWidth; x++) {
-				ShowTile(x, y, GetTilemapData(x, y));
+				//ShowTile(x, y, GetTilemapData(x, y));
+				ShowTileMapData(x, y, GetTilemapData(x, y));
 			}
 		}
 		for (int y = tilemapHeight; y < tilemapHeightEx; y++) {
 			for (int x = 0; x < tilemapWidth; x++) {
 				//ShowTile(x, y, 0);
-				ShowTile(x, y, -1);
+				//ShowTile(x, y, -1);
+				ShowTileMapData(x, y, -1);
 			}
 		}
 		ShowAllShape();
+	}
+
+	#endregion
+
+
+	#region 显示光标
+
+	// selectedShape
+
+	[System.NonSerialized]
+	public int cursorTileIndex = 5;
+
+	public void RefreshCursorShow() {
+		// ？对方块的所有占据格 显示比一个方格稍大的图形到方块图层下 ...
+		if (selectedShape != null) {
+			Vector2Int[] list = selectedShape.GetOccupyPositionList();
+			foreach (Vector2Int pos in list) {
+				ShowTileCursor(pos, cursorTileIndex);
+			}
+		}
+	}
+
+	public void ClearCursorShow() {
+		if (selectedShape != null) {
+			Vector2Int[] list = selectedShape.GetOccupyPositionList();
+			foreach (Vector2Int pos in list) {
+				ShowTileCursor(pos, -1);
+			}
+		}
+
 	}
 
 	#endregion
