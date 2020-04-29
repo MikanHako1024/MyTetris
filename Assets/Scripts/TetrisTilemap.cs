@@ -16,41 +16,62 @@ public class TetrisTilemap : MonoBehaviour {
 	public UnityEngine.Tilemaps.Tilemap tilemap;
 
 	private void Start() {
-		tilemap = GetComponent<UnityEngine.Tilemaps.Tilemap>();
+		if (tilemap == null) {
+			tilemap = GetComponent<UnityEngine.Tilemaps.Tilemap>();
+		}
 		//InitLayerOrder();
 		InitTilemapData();
 		RefreshTilemapShow();
 	}
-	
-	private void FixedUpdate () {
+
+	private void FixedUpdate() {
 		UpdateAllShape();
 	}
 	
-	
+	public void UpdateAllShape() {
+		ClearShapeShow();
+
+		UpdateCreateNewShape();
+
+		UpdateAllShapeDown();
+		UpdateMarkStopShape();
+
+		UpdateShapeMove();
+		UpdateSelectShape();
+
+		UpdateCheckEliminateLine();
+		ShowAllShape();
+	}
+
+
+	/*
 	public float CreateInterval = 1f;
 	[System.NonSerialized]
 	public float lastCreateTime = -60f;
 
 	private void Update() {
-		// 暂时这样
-		// TODO : ...
+		// 暂时这样创建新的下落图形
 		if (Input.GetKey(KeyCode.Z) && Time.time - lastCreateTime > CreateInterval) {
 			TetrisShape shape = new TetrisShape();
 			shape.SetPosition(GetTopCenterPosition());
 			AddShape(shape);
 
 			lastCreateTime = Time.time;
-			
+
 			//selectedShape = shape;
 			// ？因为更换selectedShape的时候还要变换其他的东西 ...
 			// ？比如还要清除选中方块的光标等 ...
 			// ？所以要把更换selectedShape写成一个方法或setter 在方法里完成其他操作 ...
 			// ？对selectedShape更安全、严格的管理，即是扩展其getter,setter，在其中完成其他操作使得安全 ...
 			// TODO : 笔记
-			SetSelectedShape(shape);
+			//SetSelectedShape(shape);
+			if (shape != null) {
+				SetSelectedShape(shape);
+			}
 		}
 	}
-	
+	*/
+
 
 	#region 地图数据
 
@@ -64,7 +85,7 @@ public class TetrisTilemap : MonoBehaviour {
 			return tilemapHeight + 4;
 		}
 	}
-	
+
 	public TileBase[] tileList;
 
 	//public enum tilemapType {
@@ -92,7 +113,7 @@ public class TetrisTilemap : MonoBehaviour {
 	public int GetTilemapData(Vector2Int pos) {
 		return GetTilemapData(pos.x, pos.y);
 	}
-	
+
 	// 对于高度拓展的部分 需要视为地图内
 	public int GetTilemapDataEx(int x, int y) {
 		//if (tilemapHeight <= y && y < tilemapHeightEx) return 0;
@@ -106,8 +127,8 @@ public class TetrisTilemap : MonoBehaviour {
 	}
 
 	public void SetTilemapData(int x, int y, int data) {
-		if (!(0 <= x && x < tilemapWidth)) return ;
-		if (!(0 <= y && y < tilemapHeight)) return ;
+		if (!(0 <= x && x < tilemapWidth)) return;
+		if (!(0 <= y && y < tilemapHeight)) return;
 		tilemapData[y][x] = data;
 		// ？修改 tilemapData 的同时直接写进 tilemap ...
 		// ？而不必在固定时间 全部写进 tilemap ...
@@ -131,7 +152,7 @@ public class TetrisTilemap : MonoBehaviour {
 
 
 	#region 执行方块移动和旋转
-	
+
 	public enum ShapeMoveType {
 		down, left, right, spin, spinInv
 	}
@@ -177,7 +198,7 @@ public class TetrisTilemap : MonoBehaviour {
 		}
 		return true;
 	}
-	
+
 	//public TetrisShape tempShape = new TetrisShape();
 	// ？...
 	public TetrisShape tempShape = null;
@@ -197,29 +218,65 @@ public class TetrisTilemap : MonoBehaviour {
 		InvokeShapeMove(tempShape, moveType);
 		return CheckShapeVaild(tempShape);
 	}
-	
+
 	public bool CheckShapeStop(TetrisShape shape) {
 		return !CheckShapeMoveVaild(shape, ShapeMoveType.down);
 	}
 
 	#endregion
 
-	
+
 	#region 方块数组
-	
+
 	//public TetrisShape[] shapeList;
 	//public List<TetrisShape> shapeList = new List<TetrisShape>();
 	public Dictionary<TetrisShape, TetrisShapeInfo> shapeDict = new Dictionary<TetrisShape, TetrisShapeInfo>();
-	
+	// ？为了能在切换选中图形的时候有一个固定顺序 改 字典 为 列表 ...
+	// ？为了能保留info，使用KeyValuePair，不过这样就不能对list查找了 ...
+	// ？若不查找，则需要维护当前选中图形的索引号 ...
+	//public List<KeyValuePair<TetrisShape, TetrisShapeInfo>> shapeList = new List<KeyValuePair<TetrisShape, TetrisShapeInfo>>();
+
+	// ？暂时直接存方块的列表，查找直接使用遍历 ...
+	public List<TetrisShape> shapeList = new List<TetrisShape>();
+
 	public void AddShape(TetrisShape shape) {
 		TetrisShapeInfo info = new TetrisShapeInfo(shape);
 		shapeDict.Add(shape, info);
+
+		shapeList.Add(shape);
 	}
 
 	public TetrisShapeInfo RemoveShape(TetrisShape shape) {
 		if (shapeDict.ContainsKey(shape)) {
 			TetrisShapeInfo info = shapeDict[shape];
 			shapeDict.Remove(shape);
+
+			// ？刷新选中 ...
+			TetrisShape newSelShape;
+			if (shape == selectedShape) {
+				if (shapeList.Count > 1) {
+					newSelShape = shapeList[NextSelIndex()];
+				}
+				else {
+					newSelShape = null;
+				}
+			}
+			else {
+				newSelShape = selectedShape;
+			}
+			//newSelShape = shape == selectedShape ? shapeList[NextSelIndex()] : selectedShape;
+			//newSelShape = newSelShape == shape ? null : newSelShape;
+			// ？确定新的图形或当前图形，再用selectedShape的setter计算其索引 ...
+			//selectedShape = newSelShape;
+			// ？需要在移除shape后 再查找其索引 ...
+			
+			// ？移除的方块必然是停止的 ...
+			// ？所以只需要在判断停止的逻辑和移除的逻辑中，选一处插入刷新选中的逻辑即可 ...
+			// ？这里选择在移除的时候 ...
+			shapeList.Remove(shape);
+			selectedShape = newSelShape;
+			//SetSelectedShape(newSelShape);
+
 			return info;
 		}
 		else {
@@ -301,7 +358,7 @@ public class TetrisTilemap : MonoBehaviour {
 	#region 停止方块
 
 	public bool StopShape(TetrisShape shape) {
-		CheckSelectedShapeStop(shape);
+		//CheckSelectedShapeStop(shape);
 
 		TetrisShapeInfo info = RemoveShape(shape);
 		if (info != null) {
@@ -322,14 +379,45 @@ public class TetrisTilemap : MonoBehaviour {
 
 	#endregion
 
-	
+
 	#region 选中的图形
-	
+
+	//[System.NonSerialized]
+	//public TetrisShape selectedShape = null;
+	// ？改用索引存储选中图形 ...
+	// ？再为selectedShape写getter,setter访问器，以继续支持之前的操作 ...
 	[System.NonSerialized]
-	public TetrisShape selectedShape = null;
-	
+	public int selectedShapeIndex = -1;
+	public TetrisShape selectedShape {
+		get {
+			if (0 <= selectedShapeIndex && selectedShapeIndex < shapeList.Count) {
+				return shapeList[selectedShapeIndex];
+			}
+			else {
+				return null;
+			}
+		}
+		set {
+			//selectedShapeIndex = shapeList.FindIndex(value); 
+			// ？System.predicate<T> match ...
+			// ？暂时直接遍历 ...
+			if (value == null) {
+				selectedShapeIndex = -1;
+			}
+			else {
+				for (int i = 0; i < shapeList.Count; i++) {
+					if (shapeList[i] == value) {
+						selectedShapeIndex = i;
+						break;
+					}
+				}
+			}
+		}
+	}
+
 	public void SetSelectedShape(TetrisShape shape) {
-		ClearCursorShow();
+		// ？改变选中图形前 需要用之前图形的信息清除光标 ...
+		//ClearCursorShow();
 		selectedShape = shape;
 	}
 
@@ -337,16 +425,21 @@ public class TetrisTilemap : MonoBehaviour {
 		SetSelectedShape(null);
 	}
 
+	/*
 	// ？在停止图形的时候 判断是否是被选中的图形 若是则清除光标 ...
 	public bool CheckSelectedShapeStop(TetrisShape shape) {
 		if (shape == selectedShape) {
-			UnsetSelectedShape();
+			//UnsetSelectedShape();
+			// ？可以切换选中之后 选中方块停止后不是清楚选中 而是选择下一个 ...
+			...
 			return true;
 		}
 		else {
 			return false;
 		}
 	}
+	*/
+	// ？移进停止方块或移除方块的逻辑中 ...
 
 	#endregion
 
@@ -391,9 +484,10 @@ public class TetrisTilemap : MonoBehaviour {
 	// ？不是限制每次触发的间隔 ...
 	// ？而是应该把判定的Input.GetKey改成Input.GetKeyDown ...
 	
-	public float keyInterval = 0.1f;
+	public float keyInterval = 0.08f;
 	[System.NonSerialized]
 	public float lastKeyTimeLR = -60f;
+	[System.NonSerialized]
 	public float lastKeyTimeD = -60f;
 	
 	public bool allowKeyDownLR {
@@ -426,10 +520,13 @@ public class TetrisTilemap : MonoBehaviour {
 				//InvokeShapeMoveIfCan(selectedShape, ShapeMoveType.spin);
 				InvokeShapeMoveIfCan(selectedShape, ShapeMoveType.spinInv);
 			}
-			else if (Input.GetKeyDown(KeyCode.DownArrow) && allowKeyDownD) {
+			//else if (Input.GetKeyDown(KeyCode.DownArrow) && allowKeyDownD) {
+			else if (Input.GetKey(KeyCode.DownArrow) && allowKeyDownD) {
 				InvokeShapeMoveIfCan(selectedShape, ShapeMoveType.down);
 				RefreshKeyTimeD();
 			}
+
+			// ？TODO : 允许独立移动，即全为if，不要else ...
 		}
 	}
 
@@ -574,8 +671,8 @@ public class TetrisTilemap : MonoBehaviour {
 	// ？...
 
 	#endregion
-
-
+	
+	
 	#region 显示图形
 
 	public void ClearShapeShow() {
@@ -594,11 +691,11 @@ public class TetrisTilemap : MonoBehaviour {
 			}
 		}
 
-		ClearCursorShow();
+		//ClearCursorShow();
 	}
 
 	public void ShowAllShape() {
-		RefreshCursorShow();
+		//RefreshCursorShow();
 
 		Vector2Int[] list;
 		foreach (TetrisShape shape in shapeDict.Keys) {
@@ -638,7 +735,8 @@ public class TetrisTilemap : MonoBehaviour {
 
 
 	#region 显示光标
-
+	
+	/*
 	// selectedShape
 
 	[System.NonSerialized]
@@ -661,12 +759,15 @@ public class TetrisTilemap : MonoBehaviour {
 				ShowTileCursor(pos, -1);
 			}
 		}
-
 	}
+	*/
+	
+	// ？需要让被选中的图形顶置，但是?渲染顺序是按瓦片顺序 ...
+	// ？把逻辑交给 TetrisSelShapeTilemap 处理 ...
 
 	#endregion
 
-
+	
 	#region 判断和消除行
 
 	public void UpdateCheckEliminateLine() {
@@ -746,14 +847,114 @@ public class TetrisTilemap : MonoBehaviour {
 	#endregion
 
 
-	public void UpdateAllShape() {
-		ClearShapeShow();
-		UpdateAllShapeDown();
-		UpdateMarkStopShape();
-		UpdateShapeMove();
-		UpdateCheckEliminateLine();
-		ShowAllShape();
+	#region 切换选中图形
+	
+	public int NextSelIndex() {
+		if (shapeList.Count == 0) {
+			return -1;
+		}
+		else {
+			return (selectedShapeIndex + 1) % shapeList.Count;
+		}
 	}
+	// ？计算而不赋值 ...
+	// ？仅是计算下一个，而不直接参与逻辑中的修改 ...
+
+	public int LastSelIndex() {
+		if (shapeList.Count == 0) {
+			return -1;
+		}
+		else {
+			return (selectedShapeIndex - 1 + shapeList.Count) % shapeList.Count;
+		}
+	}
+
+	//public int NextSelIndexBeforeRemove() {
+	//	if (shapeList.Count == 0) {
+	//	}
+	//	else if (shapeList.Count == 1) {
+	//	}
+	//	else {
+	//	}
+	//}
+	// ？不只删除选中图形时 需要处理选中索引 ...
+	// ？选中图形索引在删除图形索引后时 也要处理索引 ...
+	// ？与其分情况考虑索引的变化 ...
+	// ？不如直接重新计算索引，就像重新赋值选中图形那样 ...
+
+	public void SelectNextShape() {
+		selectedShapeIndex = NextSelIndex();
+	}
+
+	public void SelectLastShape() {
+		selectedShapeIndex = LastSelIndex();
+	}
+	
+
+	[System.NonSerialized]
+	public float lastKeyTimeAS = -60f;
+	public bool allowKeyDownAS {
+		get { return Time.time - lastKeyTimeAS >= keyInterval; }
+	}
+	public void RefreshKeyTimeAS() {
+		lastKeyTimeAS = Time.time;
+	}
+
+	public void UpdateSelectShape() {
+		if (Input.GetKeyDown(KeyCode.A) && allowKeyDownAS) {
+			SelectLastShape();
+			RefreshKeyTimeAS();
+		}
+		else if (Input.GetKeyDown(KeyCode.S) && allowKeyDownAS) {
+			SelectNextShape();
+			RefreshKeyTimeAS();
+		}
+	}
+
+	#endregion
+
+
+	#region 产生下落方块
+
+	//public float CreateInterval = 1f;
+	//[System.NonSerialized]
+	//public float lastCreateTime = -60f;
+	
+	[System.NonSerialized]
+	public float lastKeyTimeZ = -60f;
+	public bool allowKeyDownZ {
+		get { return Time.time - lastKeyTimeZ >= keyInterval; }
+	}
+	public void RefreshKeyTimeZ() {
+		lastKeyTimeAS = Time.time;
+	}
+
+	public void UpdateCreateNewShape() {
+		// 暂时这样创建新的下落图形
+		//if (Input.GetKey(KeyCode.Z) && Time.time - lastCreateTime > CreateInterval) {
+		if (Input.GetKeyDown(KeyCode.Z) && allowKeyDownZ) {
+			TetrisShape shape = new TetrisShape();
+			shape.SetPosition(GetTopCenterPosition());
+			AddShape(shape);
+
+			//lastCreateTime = Time.time;
+			RefreshKeyTimeZ();
+
+			//selectedShape = shape;
+			// ？因为更换selectedShape的时候还要变换其他的东西 ...
+			// ？比如还要清除选中方块的光标等 ...
+			// ？所以要把更换selectedShape写成一个方法或setter 在方法里完成其他操作 ...
+			// ？对selectedShape更安全、严格的管理，即是扩展其getter,setter，在其中完成其他操作使得安全 ...
+			// TODO : 笔记
+			//SetSelectedShape(shape);
+			if (shape != null) {
+				SetSelectedShape(shape);
+			}
+		}
+	}
+
+	#endregion
+
 }
 
 // ？分为活动的方块和停止的方块 ...

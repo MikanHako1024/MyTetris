@@ -511,7 +511,7 @@ public class TetrisShape {
 	public void MoveSpinInv() {
 		//int spinCount = shapeData[type].Length;
 		spin = (spin - 1 + spinCount) % spinCount;
-		Debug.Log((3 - 6) % 5); // 负数取模测试
+		//Debug.Log((3 - 6) % 5); // 负数取模测试
 	}
 
 	#endregion
@@ -566,5 +566,28 @@ public class TetrisShape {
 	}
 
 	#endregion
+
+
+	#region 画进tilemap
+	
+	// TODO : 待完成 待使用
+	
+	/*
+	private static Vector2Int[] tempPosList;
+	private static UnityEngine.Tilemaps.TileBase[] tempTiles = { null, null, null, null, null, };
+
+	public void DrawShape(UnityEngine.Tilemaps.Tilemap tilemap, 
+			UnityEngine.Tilemaps.TileBase[] tiles) {
+		tempPosList = GetOccupyPositionList();
+		foreach (Vector2Int pos in tempPosList) {
+			tilemap.SetTiles...
+		}
+	}
+
+	...
+	*/
+
+	#endregion
+
 }
 
