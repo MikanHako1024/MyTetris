@@ -20,12 +20,16 @@ public class TetrisTilemap : MonoBehaviour {
 			tilemap = GetComponent<UnityEngine.Tilemaps.Tilemap>();
 		}
 		//InitLayerOrder();
-		InitTilemapData();
-		RefreshTilemapShow();
+
+		//InitTilemapData();
+		//RefreshTilemapShow();
+		GameInit();
 	}
 
 	private void FixedUpdate() {
-		UpdateAllShape();
+		if (isGameRunning) {
+			UpdateAllShape();
+		}
 	}
 	
 	public void UpdateAllShape() {
@@ -282,6 +286,13 @@ public class TetrisTilemap : MonoBehaviour {
 		else {
 			return null;
 		}
+	}
+
+	public void ClearAllShape() {
+		ClearShapeShow(); // ？清理数据之前要清除显示 ...
+		shapeDict.Clear();
+		shapeList.Clear();
+		selectedShape = null;
 	}
 
 	#endregion
@@ -771,8 +782,9 @@ public class TetrisTilemap : MonoBehaviour {
 	#region 判断和消除行
 
 	public void UpdateCheckEliminateLine() {
-		CheckEliminateAllLine();
-		// TODO : 增加分数 等
+		int lines = CheckEliminateAllLine();
+		AddScore(lines);
+		// TODO : 增加分数的效果 等
 	}
 
 	public int CheckEliminateAllLine() {
@@ -847,8 +859,41 @@ public class TetrisTilemap : MonoBehaviour {
 	#endregion
 
 
-	#region 切换选中图形
+	#region 游戏分数
 	
+	public int score = 0;
+
+	public int GetScore() {
+		return score;
+	}
+	public void SetScore(int score) {
+		this.score = score; 
+	}
+
+	public void ClearScore() {
+		SetScore(0);
+	}
+
+	public int[] scoreRewardList = {0, 10, 20, 30, 40};
+
+	public int ScoreReward(int lines) {
+		if (lines < 0)
+			return scoreRewardList[0];
+		else if (lines >= scoreRewardList.Length)
+			return scoreRewardList[scoreRewardList.Length - 1];
+		else 
+			return scoreRewardList[lines];
+	}
+
+	public void AddScore(int lines) {
+		score += ScoreReward(lines);
+	}
+
+	#endregion
+
+
+	#region 切换选中图形
+
 	public int NextSelIndex() {
 		if (shapeList.Count == 0) {
 			return -1;
@@ -914,27 +959,54 @@ public class TetrisTilemap : MonoBehaviour {
 	#endregion
 
 
+	#region 创建图形
+
+	public TetrisShape CreateRandomShape() {
+		TetrisShape shape = new TetrisShape();
+		shape.SetPosition(GetTopCenterPosition());
+		return shape;
+	}
+
+	public void AddRandomShape(int count = 1) {
+		TetrisShape shape;
+		for (int i = 0; i < count; i++) {
+			shape = CreateRandomShape();
+			AddShape(shape);
+			if (selectedShape == null) {
+				SetSelectedShape(shape);
+			}
+		}
+	}
+
+	#endregion
+
+
 	#region 产生下落方块
 
+	/*
 	//public float CreateInterval = 1f;
 	//[System.NonSerialized]
 	//public float lastCreateTime = -60f;
 	
+	public float createInterval = 1f;
+
 	[System.NonSerialized]
 	public float lastKeyTimeZ = -60f;
 	public bool allowKeyDownZ {
-		get { return Time.time - lastKeyTimeZ >= keyInterval; }
+		//get { return Time.time - lastKeyTimeZ >= keyInterval; }
+		get { return Time.time - lastKeyTimeZ >= createInterval; }
 	}
 	public void RefreshKeyTimeZ() {
-		lastKeyTimeAS = Time.time;
+		lastKeyTimeZ = Time.time;
 	}
 
 	public void UpdateCreateNewShape() {
 		// 暂时这样创建新的下落图形
 		//if (Input.GetKey(KeyCode.Z) && Time.time - lastCreateTime > CreateInterval) {
 		if (Input.GetKeyDown(KeyCode.Z) && allowKeyDownZ) {
-			TetrisShape shape = new TetrisShape();
-			shape.SetPosition(GetTopCenterPosition());
+			//TetrisShape shape = new TetrisShape();
+			//shape.SetPosition(GetTopCenterPosition());
+			TetrisShape shape = CreateRandomShape();
 			AddShape(shape);
 
 			//lastCreateTime = Time.time;
@@ -946,13 +1018,161 @@ public class TetrisTilemap : MonoBehaviour {
 			// ？所以要把更换selectedShape写成一个方法或setter 在方法里完成其他操作 ...
 			// ？对selectedShape更安全、严格的管理，即是扩展其getter,setter，在其中完成其他操作使得安全 ...
 			// TODO : 笔记
-			//SetSelectedShape(shape);
-			if (shape != null) {
-				SetSelectedShape(shape);
-			}
+			SetSelectedShape(shape);
+			//if (shape != null) {
+			//if (selectedShape == null) {
+			//	SetSelectedShape(shape);
+			//}
+			// ？主动创建的话 暂时直接选中新方块即可 ...
+		}
+	}
+	*/
+	// 改成自动创建下落方块
+
+	public float fixedCreateNewShapeInterval = 5f;
+
+	public float createNewShapeInterval {
+		get { return fixedCreateNewShapeInterval; }
+	}
+
+	[System.NonSerialized]
+	public float lastCreateNewShapeTime = -60f;
+	public bool allowCreateNewShape {
+		get {
+			//return isGameRunning && Time.time - lastCreateNewShapeTime >= createNewShapeInterval; 
+			// ？在FixedUpdate中判断游戏是否进行 ...
+			// ？其他位置(FixedUpdate中的调用)就不再判断 ...
+			return Time.time - lastCreateNewShapeTime >= createNewShapeInterval; 
+		}
+	}
+	public void RefreshCreateNewShape() {
+		lastCreateNewShapeTime = Time.time;
+	}
+	
+	public void UpdateCreateNewShape() {
+		if (allowCreateNewShape) {
+			AddRandomShape();
+			RefreshCreateNewShape();
 		}
 	}
 
+	// TODO : 更好的命名
+
+	#endregion
+
+
+	#region 游戏控制
+	
+	// ？即使多人游戏可能需要同时开始或暂停 ...
+	// ？但是也有可能有多人不同时开始或暂停的需求 ...
+	// ？所以每个游戏棋盘独自管理自己的开始和暂停 ...
+	// ？需要同时开始或暂停时，只需要用另一个管理器同时对多个游戏棋盘操作即可 ...
+	
+	[System.NonSerialized]
+	public bool isGameStart = false;
+	[System.NonSerialized]
+	public bool isGamePause = false;
+
+	public bool isGameRunning {
+		get { return isGameStart && !isGamePause; }
+	}
+
+	public void StartGame() {
+		//if (!isGameStart) {
+		//	isGameStart = true;
+		//	isGamePause = false;
+		//}
+		//else {
+		//	isGamePause = false;
+		//}
+		if (!isGameStart) {
+			GameBegin();
+			isGameStart = true;
+		}
+		isGamePause = false;
+	}
+	public void StopGame() {
+		//if (isGameStart) {
+		//	isGameStart = false;
+		//	isGamePause = false;
+		//}
+		//else {
+		//	isGamePause = false;
+		//}
+		if (isGameStart) {
+			GameEnd();
+			isGameStart = false;
+		}
+		isGamePause = false;
+	}
+
+	public void GameRestart() {
+		StopGame();
+		StartGame();
+		// TODO : other ...
+	}
+	
+	public void PauseGame() {
+		if (isGameStart && !isGamePause) {
+			PauseBegin();
+			isGamePause = true;
+		}
+	}
+	public void ContinueGame() {
+		if (isGameStart && isGamePause) {
+			PauseEnd();
+			isGamePause = false;
+		}
+	}
+
+	#endregion
+
+
+	#region 暂停时的时间变化
+	
+	// ？以解决 暂停时当前时间仍会前进，但记录的上一次操作时间不变 的问题 ...
+
+	[System.NonSerialized]
+	public float pauseTime = 0f;
+
+	public void PauseBegin() {
+		pauseTime = Time.time;
+	}
+
+	public void PauseEnd() {
+		float addTime = Time.time - pauseTime;
+		lastKeyTimeAS += addTime;
+		lastKeyTimeD += addTime;
+		lastKeyTimeLR += addTime;
+		lastCreateNewShapeTime += addTime;
+	}
+
+	#endregion
+
+
+	#region 游戏开始和清理
+
+	public void GameBegin() {
+		GameEnd();
+		GameClear();
+	}
+
+	public void GameEnd() {
+		// TODO : other ...
+	}
+
+	public void GameClear() {
+		InitTilemapData(); // ？暂时每次都重新创建数组 ...
+		RefreshTilemapShow();
+		ClearAllShape();
+		ClearScore();
+		// TODO : other ...
+	}
+
+	public void GameInit() {
+		GameClear();
+	}
+	
 	#endregion
 
 }

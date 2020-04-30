@@ -5,6 +5,8 @@ using UnityEngine.Tilemaps;
 
 // ？TODO : 写一个基类 ...
 
+// ？TODO : 或者合并进 TetrisTilemap ...
+
 public class TetrisSelShapeTilemap : MonoBehaviour {
 	
 	public UnityEngine.Tilemaps.Tilemap tilemap;

@@ -8,6 +8,9 @@ using UnityEngine;
 // ？TODO : 是否应该把方块的图形里的位置 也放到方块的信息里 ...
 // ？这样一来 方块的图形就只需要一些固定的图形信息 ...
 
+
+// TODO : 增加其他的内容 ...
+
 public class TetrisShapeInfo {
 	
 	public int speedCount = 20;
